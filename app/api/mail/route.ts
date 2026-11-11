@@ -1,6 +1,6 @@
 import { db, encryptionKey, allowedOrigin } from '../../../lib/local-store';
 import { getDashboardUser } from '../../../lib/auth';
-import { folderSchema, hostinger, MailError, messagePath, sendSchema } from '../../../lib/mail';
+import { folderSchema, hostinger, MailError, messagePath, messageText, sendSchema } from '../../../lib/mail';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -83,7 +83,7 @@ async function handle(request: Request, download=false) {
       return json(await hostinger(token,`${messagePath(mailbox,folder)}${search?'/search':''}?page=${page}&perPage=25&sort=-date`,search?'POST':'GET',search?{...(q?{subject:q,from:q,to:q,body:q}:{}),...(b.starred?{flags:['\\Flagged']}:{} )}:undefined));
     }
     const uid=z.coerce.number().int().positive().parse(b.uid), path=messagePath(mailbox,folder,uid);
-    if(b.op==='detail') return json(await hostinger(token,`${path}/text`));
+    if(b.op==='detail') return json(await messageText(token,path));
     if(b.op==='flag') {
       const flag=z.enum(['\\Seen','\\Flagged']).parse(b.flag), enabled=z.boolean().parse(b.enabled);
       return json(await hostinger(token,path,'PATCH',{[enabled?'addFlags':'removeFlags']:[flag]}));

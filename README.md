@@ -48,6 +48,8 @@ Type RESET, restart the app, and create a new password. Email connections and dr
 
 Mail stays at Hostinger. Drafts and follow-up statuses are stored in Maildesk, separately from Hostinger's folders. Saved drafts do not retain attachments; reattach them after reopening. Forwarding quotes the original text; add original files manually. Attachments are limited to 10 files and 5 MB total per outgoing message.
 
+Email bodies are decoded from their original MIME source using declared transfer encodings and character sets. This avoids garbled text returned by Hostinger's rendered-text endpoint for some plain messages. Attachments are streamed and discarded while reading; opening a message does not save them locally. Messages with a source larger than 32 MB must be opened in Hostinger Webmail. HTML-only emails are still displayed as text.
+
 Messages load in batches of 25 per account. Use Load older messages for more. The first page refreshes every two minutes while visible. Counters and follow-up filters apply to loaded messages. Sending success means Hostinger accepted the message; delivery failures may still occur. Check Sent before retrying an uncertain send.
 
 ## Development and validation

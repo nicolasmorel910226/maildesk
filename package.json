@@ -14,18 +14,20 @@
     "test": "node --experimental-transform-types tests/local-security.test.mjs && node --experimental-transform-types tests/mail.test.mjs && node --experimental-transform-types tests/conversations.test.mjs"
   },
   "dependencies": {
+    "lucide-react": "^1.31.0",
+    "mailparser": "3.14.3",
     "next": "16.3.4",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "lucide-react": "^1.31.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",
-    "tailwindcss": "4.2.1",
-    "typescript": "5.9.3",
+    "@types/mailparser": "3.9.0",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3"
+    "@types/react-dom": "19.2.3",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3"
   }
 }
