@@ -14,6 +14,34 @@ export function messagePath(mailbox: string, folder: string, uid?: number) {
   return `/mailboxes/${encodeURIComponent(mailbox)}/folders/${encodeURIComponent(folder)}/messages${uid === undefined ? '' : `/${uid}`}`;
 }
 export class MailError extends Error { constructor(message: string, public status = 400) { super(message); } }
+const identitySchema = z.object({ data: z.object({
+  orderResourceId: z.string().min(1),
+  mailboxes: z.array(z.object({resourceId: z.string().min(1), address: z.string().email()})),
+}) });
+let environmentCache: {token:string;expires:number;request:Promise<z.infer<typeof identitySchema>['data']>} | undefined;
+export function environmentConnection() {
+  const token = process.env.HOSTINGER_MAIL_API_TOKEN?.trim();
+  if (!token) return null;
+  if (token.length < 10 || token.length > 4096 || /\s/.test(token))
+    throw new MailError('The server email token is invalid. Ask the workspace administrator to update it.', 503);
+  const label = process.env.HOSTINGER_MAIL_CONNECTION_NAME?.trim() || 'Business email';
+  return {token, label: label.slice(0,80)};
+}
+export async function environmentIdentity(force = false) {
+  const config = environmentConnection();
+  if (!config) throw new MailError('Email is not configured on this server. Ask the workspace administrator to configure it.', 503);
+  if (force || !environmentCache || environmentCache.token !== config.token || environmentCache.expires <= Date.now()) {
+    const request = hostinger(config.token, '/me').then(value => {
+      const parsed = identitySchema.safeParse(value);
+      if (!parsed.success) throw new MailError('Hostinger returned an invalid mailbox list. Try refreshing the connection.', 502);
+      return parsed.data.data;
+    });
+    const entry = {token:config.token, expires:Date.now()+60000, request};
+    environmentCache = entry;
+    request.catch(() => {if (environmentCache === entry) environmentCache = undefined;});
+  }
+  return {...config, ...await environmentCache.request};
+}
 // Decode the original MIME source, not Hostinger's rendered /text response:
 // that endpoint can incorrectly base64-decode a plain, unencoded message body.
 export async function parseMessageText(response: Response, limit = 32 * 1024 * 1024) {

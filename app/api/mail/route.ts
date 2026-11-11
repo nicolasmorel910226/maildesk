@@ -1,40 +1,32 @@
-import { db, encryptionKey, allowedOrigin } from '../../../lib/local-store';
+import { db, allowedOrigin } from '../../../lib/local-store';
 import { getDashboardUser } from '../../../lib/auth';
-import { folderSchema, hostinger, MailError, messagePath, messageText, sendSchema } from '../../../lib/mail';
+import { folderSchema, hostinger, MailError, messagePath, messageText, sendSchema, environmentConnection, environmentIdentity } from '../../../lib/mail';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: {'Cache-Control':'no-store'} });
 export const runtime = 'nodejs';
-async function key() {
-  return crypto.subtle.importKey('raw', new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(encryptionKey()))), 'AES-GCM', false, ['encrypt','decrypt']);
-}
-async function encrypt(value: string) {
-  const iv=crypto.getRandomValues(new Uint8Array(12)); const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await key(),new TextEncoder().encode(value)));
-  return btoa(String.fromCharCode(...iv))+'.'+btoa(String.fromCharCode(...ciphertext));
-}
-async function decrypt(value: string) {
-  const [iv,data]=value.split('.').map(s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
-  return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv},await key(),data));
-}
 async function access(owner: string, mailbox: string) {
-  const row=await db().prepare('SELECT c.secret FROM connections c JOIN mailboxes m ON m.connection_id=c.id AND m.owner=c.owner WHERE m.owner=? AND m.id=?').bind(owner,mailbox).first<{secret:string}>();
-  if (!row) throw new MailError('Connect this mailbox first.',403);
-  return decrypt(row.secret);
+  // Authorize against the currently configured token, never a legacy saved token.
+  const info = await environmentIdentity();
+  if (!info.mailboxes.some(m => m.resourceId === mailbox)) throw new MailError('This mailbox is not available to the server email connection.',403);
+  const row = await db().prepare('SELECT id FROM mailboxes WHERE owner=? AND id=?').bind(owner,mailbox).first();
+  if (!row) throw new MailError('Refresh the email connection first.',403);
+  return info.token;
 }
-async function discover(owner: string, connection: string, token: string) {
-  const info=await hostinger(token,'/me');
-  const boxes=z.array(z.object({resourceId:z.string(),address:z.string().email()})).parse(info.data.mailboxes);
-  const statements=[db().prepare('DELETE FROM mailboxes WHERE owner=? AND connection_id=?').bind(owner,connection), ...boxes.map(m=>db().prepare('INSERT INTO mailboxes (id,owner,connection_id,address) VALUES (?,?,?,?) ON CONFLICT(owner,id) DO UPDATE SET connection_id=excluded.connection_id,address=excluded.address').bind(m.resourceId,owner,connection,m.address))];
-  await db().batch(statements);
-}
-async function bootstrap(owner: string) {
-  const [connections,mailboxes,records]=await Promise.all([
-    db().prepare('SELECT id,label,created_at FROM connections WHERE owner=? ORDER BY created_at').bind(owner).all(),
-    db().prepare('SELECT id,address,connection_id FROM mailboxes WHERE owner=? ORDER BY address').bind(owner).all(),
-    db().prepare('SELECT key,value FROM records WHERE owner=?').bind(owner).all<{key:string,value:string}>(),
+async function bootstrap(owner: string, force = false) {
+  const records = await db().prepare('SELECT key,value FROM records WHERE owner=?').bind(owner).all<{key:string,value:string}>();
+  const saved = Object.fromEntries(records.results.map(r=>[r.key,JSON.parse(r.value)]));
+  if (!environmentConnection()) return {connections:[],accounts:[],records:saved,environmentConfigured:false};
+  const info = await environmentIdentity(force);
+  const existing = await db().prepare('SELECT id FROM connections WHERE owner=? AND order_id=?').bind(owner,info.orderResourceId).first<{id:string}>();
+  const id = existing?.id || `env:${owner}:${info.orderResourceId}`;
+  await db().batch([
+    db().prepare('INSERT INTO connections(id,owner,label,order_id,secret,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,secret=excluded.secret').bind(id,owner,info.label,info.orderResourceId,'',new Date().toISOString()),
+    db().prepare('DELETE FROM mailboxes WHERE owner=? AND connection_id=?').bind(owner,id),
+    ...info.mailboxes.map(m=>db().prepare('INSERT INTO mailboxes(id,owner,connection_id,address) VALUES(?,?,?,?) ON CONFLICT(owner,id) DO UPDATE SET connection_id=excluded.connection_id,address=excluded.address').bind(m.resourceId,owner,id,m.address)),
   ]);
-  return {connections:connections.results,accounts:mailboxes.results,records:Object.fromEntries(records.results.map(r=>[r.key,JSON.parse(r.value)]))};
+  return {connections:[{id,label:info.label}],accounts:info.mailboxes.map(m=>({id:m.resourceId,address:m.address,connection_id:id})),records:saved,environmentConfigured:true};
 }
 async function handle(request: Request, download=false) {
   try {
@@ -48,25 +40,8 @@ async function handle(request: Request, download=false) {
     if(download && b.op!=='attachment') return json({error:'Method not allowed.'},405);
     const owner=user.userId;
     if (b.op==='bootstrap') return json(await bootstrap(owner));
-    if (b.op==='connect') {
-      const token=z.string().trim().min(10).max(4096).parse(b.token), label=z.string().trim().min(1).max(80).parse(b.label);
-      const info=await hostinger(token,'/me'); const order=z.string().parse(info.data.orderResourceId);
-      const existing=await db().prepare('SELECT id FROM connections WHERE owner=? AND order_id=?').bind(owner,order).first<{id:string}>();
-      const id=existing?.id||crypto.randomUUID();
-      await db().prepare('INSERT INTO connections(id,owner,label,order_id,secret,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,secret=excluded.secret').bind(id,owner,label,order,await encrypt(token),new Date().toISOString()).run();
-      await discover(owner,id,token); return json(await bootstrap(owner));
-    }
-    if(b.op==='disconnect') {
-      const id=z.string().parse(b.id);
-      await db().batch([db().prepare('DELETE FROM mailboxes WHERE owner=? AND connection_id=?').bind(owner,id),db().prepare('DELETE FROM connections WHERE owner=? AND id=?').bind(owner,id)]);
-      return json(await bootstrap(owner));
-    }
-    if(b.op==='discover') {
-      const rows=await db().prepare('SELECT id,secret FROM connections WHERE owner=?').bind(owner).all<{id:string,secret:string}>();
-      const errors:string[]=[];
-      for(const row of rows.results) { try {await discover(owner,row.id,await decrypt(row.secret));} catch(e) {errors.push(e instanceof Error?e.message:'Connection failed');} }
-      return json({...await bootstrap(owner),errors});
-    }
+    if (b.op==='connect' || b.op==='disconnect') return json({error:'Email connections are managed in the server environment. Ask the workspace administrator to update the configuration.'},403);
+    if (b.op==='discover') return json(await bootstrap(owner,true));
     if(b.op==='record') {
       const key=z.string().regex(/^(draft|status):/).max(600).parse(b.key);
       if(b.value===null) await db().prepare('DELETE FROM records WHERE owner=? AND key=?').bind(owner,key).run();

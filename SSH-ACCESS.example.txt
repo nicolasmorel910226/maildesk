@@ -9,8 +9,10 @@ ssh -N -L 127.0.0.1:4387:127.0.0.1:4387 -o ExitOnForwardFailure=yes -o ServerAli
 
 Authenticate using your normal SSH key or password. Leave the window open.
 Open http://127.0.0.1:4387 in your computer's browser.
-On a new installation, create a dashboard password and connect your mailbox
-through the dashboard. Do not put email tokens or passwords into source files.
+On a new installation, configure HOSTINGER_MAIL_API_TOKEN in the private
+.env.local file on the VPS and restart the service. Create a dashboard password
+on first visit; mailboxes connect automatically after sign-in. Never put real
+email tokens or passwords into tracked source files.
 
 Close the SSH window with Ctrl+C when finished. The VPS service stays running.
 No ChatGPT login or additional domain is needed.

@@ -11,7 +11,7 @@
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1 --port 4387",
     "check": "tsc --noEmit",
-    "test": "node --experimental-transform-types tests/local-security.test.mjs && node --experimental-transform-types tests/mail.test.mjs && node --experimental-transform-types tests/conversations.test.mjs"
+    "test": "node --experimental-transform-types tests/local-security.test.mjs && node --experimental-transform-types tests/mail.test.mjs && node --experimental-transform-types tests/conversations.test.mjs && node --experimental-transform-types tests/environment.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
