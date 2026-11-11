@@ -1,0 +1,24 @@
+node_modules/
+.next/
+.maildesk/
+.env*
+outputs/
+*.tsbuildinfo
+next-env.d.ts
+
+# Private data, local deployment notes, and backups
+SSH-ACCESS.txt
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.key
+*.pem
+*.log
+*.zip
+*.tar
+*.tar.gz
+*.bak
+.DS_Store

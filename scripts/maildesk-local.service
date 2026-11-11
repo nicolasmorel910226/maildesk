@@ -1,0 +1,23 @@
+[Unit]
+Description=Maildesk private email dashboard (SSH tunnel access)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/sites/maildesk-standalone
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=MAILDESK_DATA_DIR=/root/sites/maildesk-standalone/.maildesk
+ExecStart=/root/.local/share/beastkingdom-node/node-v22.23.3-linux-x64/bin/node /root/sites/maildesk-standalone/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 4387
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/sites/maildesk-standalone/.maildesk /root/sites/maildesk-standalone/.next/cache
+
+[Install]
+WantedBy=multi-user.target

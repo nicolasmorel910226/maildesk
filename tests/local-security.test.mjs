@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync,statSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+const directory=mkdtempSync(join(tmpdir(),'maildesk-security-'));process.env.MAILDESK_DATA_DIR=directory;
+const {sql,db,encryptionKey,hashPassword,checkPassword,createOwner,hasOwner,verifyOwner,createSession,validSession,deleteSession,takeLoginAttempt,clearLoginAttempts,allowedOrigin}=await import('../lib/local-store.ts');
+test('local owner password is hashed, verified, and cannot be overwritten',async()=>{assert.equal(hasOwner(),false);await createOwner('test-password-for-unit-checks');assert.equal(hasOwner(),true);assert.equal(await verifyOwner('wrong-password'),false);assert.equal(await verifyOwner('test-password-for-unit-checks'),true);assert.notEqual(sql().prepare('SELECT password_hash FROM owner').get().password_hash,'test-password-for-unit-checks');await assert.rejects(()=>createOwner('replace-password'));});
+test('sessions can be revoked and expire; raw tokens are not stored',()=>{const token=createSession();assert.equal(validSession(token),true);assert.notEqual(sql().prepare('SELECT token_hash FROM sessions').get().token_hash,token);deleteSession(token);assert.equal(validSession(token),false);const expired=createSession();sql().prepare('UPDATE sessions SET expires=0').run();assert.equal(validSession(expired),false);});
+test('login attempts are throttled and can be cleared after a successful login',()=>{clearLoginAttempts();for(let i=0;i<10;i++)assert.equal(takeLoginAttempt(),true);assert.equal(takeLoginAttempt(),false);clearLoginAttempts();assert.equal(takeLoginAttempt(),true);});
+test('only exact loopback origins and allowed hostnames can mutate local data',()=>{const req=(origin,host)=>new Request('http://127.0.0.1:4387/api/mail',{headers:{origin,host}});assert.equal(allowedOrigin(req('http://127.0.0.1:4387','127.0.0.1:4387')),true);assert.equal(allowedOrigin(req('https://evil.example','127.0.0.1:4387')),false);assert.equal(allowedOrigin(req('http://evil.example:4387','evil.example:4387')),false);assert.equal(allowedOrigin(req('null','localhost:4387')),false);});
+test('local encryption key is stable and private',()=>{const key=encryptionKey();assert.match(key,/^[a-f0-9]{64}$/);assert.equal(encryptionKey(),key);if(process.platform!=='win32')assert.equal(statSync(join(directory,'encryption.key')).mode&0o777,0o600);});
+test('batch writes roll back on failure',async()=>{const owner='test';await assert.rejects(()=>db().batch([db().prepare('INSERT INTO records(owner,key,value) VALUES(?,?,?)').bind(owner,'draft:1','{}'),db().prepare('INSERT INTO does_not_exist(a) VALUES(?)').bind(1)]));assert.equal(await db().prepare('SELECT key FROM records WHERE owner=?').bind(owner).first(),null);});
+test.after(()=>{sql().close();rmSync(directory,{recursive:true,force:true});});

@@ -1,0 +1,26 @@
+Maildesk on a VPS
+=================
+The dashboard listens only on the VPS loopback address: 127.0.0.1:4387.
+
+Run this on YOUR COMPUTER in PowerShell or Terminal, replacing USER and VPS_HOST
+with your SSH username and VPS address (or use your existing SSH host alias):
+
+ssh -N -L 127.0.0.1:4387:127.0.0.1:4387 -o ExitOnForwardFailure=yes -o ServerAliveInterval=60 USER@VPS_HOST
+
+Authenticate using your normal SSH key or password. Leave the window open.
+Open http://127.0.0.1:4387 in your computer's browser.
+On a new installation, create a dashboard password and connect your mailbox
+through the dashboard. Do not put email tokens or passwords into source files.
+
+Close the SSH window with Ctrl+C when finished. The VPS service stays running.
+No ChatGPT login or additional domain is needed.
+
+After installing the example systemd service, manage it on the VPS with:
+systemctl status maildesk-local
+systemctl restart maildesk-local
+systemctl stop maildesk-local
+journalctl -u maildesk-local -n 50 --no-pager
+
+Keep local port 4387: this edition's request-origin checks expect that port.
+You may copy this file to SSH-ACCESS.txt for private server-specific notes;
+SSH-ACCESS.txt is excluded from Git.
