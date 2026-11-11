@@ -4,7 +4,7 @@ Manage multiple Hostinger Mail accounts from a dashboard on your computer, or on
 
 ## Git source and VPS access
 
-This repository contains the application source, dependency lockfile, launch scripts, and tests. Private runtime data (`.maildesk/`), environment files, dependencies, builds, outputs, and local SSH notes are excluded from Git. A clone starts with no password or email connections; configure these through the dashboard after starting it.
+This repository contains the application source, dependency lockfile, launch scripts, tests, and a safe `env.example` template. Private runtime data (`.maildesk/`), actual `.env` files, dependencies, builds, outputs, and local SSH notes are excluded from Git. A clone starts with no password or email connections; configure these through the dashboard after starting it.
 
 For VPS access, follow `SSH-ACCESS.example.txt`. The systemd unit in `scripts/maildesk-local.service` is an example of this installation: adjust its user, application directory, Node executable, and writable paths before installing it on a different server. Keep the dashboard bound to `127.0.0.1:4387`.
 
@@ -23,6 +23,14 @@ To save future source changes, review `git status` and `git diff`, stage the int
 Keep the launcher window open while using Maildesk. Close it or press Ctrl+C to stop the server. Start the same launcher again next time. Bookmark the local address. Use the Lock dashboard button to sign out; sessions otherwise last 12 hours.
 
 If your IDE runs on a remote machine, localhost refers to that machine. Download and extract this folder on your own computer to use the launchers there.
+
+## Optional environment configuration
+
+The defaults work without an environment file. To customize them, copy `env.example` to `.env.local` in the project root (`cp env.example .env.local` on Linux/macOS, or `Copy-Item env.example .env.local` in PowerShell), edit it, and restart the dashboard.
+
+`MAILDESK_DATA_DIR` selects the private database and encryption-key directory; `NEXT_TELEMETRY_DISABLED=1` disables Next.js telemetry. Enter your mailbox API token and dashboard password through the UI, not in the template. Changing the data directory does not move existing data: keep the current location unless you intend to migrate it or create a separate installation.
+
+Existing systemd `Environment=` settings override `.env.local`. When changing the service's data directory, update both `Environment=MAILDESK_DATA_DIR=...` and `ReadWritePaths=` in the unit. Standalone Node scripts do not load `.env.local` automatically; for a custom data location, run the password-reset script with `node --env-file=.env.local --experimental-transform-types scripts/reset-password.mjs` while the dashboard is stopped.
 
 ## Connect business email accounts
 
