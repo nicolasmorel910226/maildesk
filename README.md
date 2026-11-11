@@ -50,7 +50,7 @@ Mail stays at Hostinger. Drafts and follow-up statuses are stored in Maildesk, s
 
 Email bodies are decoded from their original MIME source using declared transfer encodings and character sets. This avoids garbled text returned by Hostinger's rendered-text endpoint for some plain messages. Attachments are streamed and discarded while reading; opening a message does not save them locally. Messages with a source larger than 32 MB must be opened in Hostinger Webmail. HTML-only emails are still displayed as text.
 
-Messages load in batches of 25 per account. Use Load older messages for more. The first page refreshes every two minutes while visible. Counters and follow-up filters apply to loaded messages. Sending success means Hostinger accepted the message; delivery failures may still occur. Check Sent before retrying an uncertain send.
+Messages load in batches of 25 per account. Use Load older messages for more. The first page refreshes every 10 seconds while visible, waiting for an in-progress load to finish before scheduling another automatic refresh. Counters and follow-up filters apply to loaded messages. Sending success means Hostinger accepted the message; delivery failures may still occur. Check Sent before retrying an uncertain send.
 
 ## Development and validation
 
@@ -68,6 +68,6 @@ Use `npm run dev` for development. After changing source, run `npm run build` be
 
 The dashboard opens to **Conversations**. It groups loaded Inbox and Sent emails by mailbox and the complete visible participant set (sender, To, and Cc), with each email subject still shown. Separate mailboxes and different groups of participants are never merged. Search applies to loaded participants and subjects. Use Load older emails for more history. Archived messages are not fetched by this view.
 
-Incoming messages appear on the left; your outgoing messages appear on the right. Write a reply at the bottom, optionally add files, then click Send reply (or Ctrl+Enter). The recipient addresses and sending mailbox are visible. For group conversations, replies go to the displayed participants. New mail refreshes every minute while the conversation view is active.
+Incoming messages appear on the left; your outgoing messages appear on the right. Write a reply at the bottom, optionally add files, then click Send reply (or Ctrl+Enter). The recipient addresses and sending mailbox are visible. For group conversations, replies go to the displayed participants. New mail refreshes every 10 seconds while the conversation view is active and the browser tab is visible. A refresh is skipped if the previous load is still running.
 
 Statuses distinguish Sending, Accepted for sending (awaiting the Sent copy), In Sent, Not sent, and Sending status unknown. Acceptance and presence in Sent do not prove recipient delivery or reading. An uncertain send is never retried automatically; check Sent before copying it back into the reply box. Demo replies do not transmit email. Conversation text remains in memory while switching tabs; Save draft stores it persistently. Reattach files after reopening a saved draft.
